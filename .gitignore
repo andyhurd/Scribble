@@ -1,0 +1,4 @@
+# ignore eclipse metadata #
+###########################
+.metadata/
+
