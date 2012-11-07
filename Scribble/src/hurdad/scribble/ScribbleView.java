@@ -1,6 +1,7 @@
 package hurdad.scribble;
 
 import java.util.ArrayList;
+import java.util.Stack;
 
 import android.content.Context;
 import android.graphics.Canvas;
@@ -16,13 +17,34 @@ import android.view.View;
 public class ScribbleView extends View {
 	private static final int PATH_START = 0;
 	private static final int PATH_MOVE = 1;
-	private static final int PATH_CLEAR = 2;
-	
+	private static final int PATH_END = 2;
+	private static final int PATH_CLEAR = 3;
+	private static final int FULL_CLEAR = 4;
+	private static final int BRUSH_CHANGE = 5;
+
 	private Handler handler;
-	private Paint paint;
+
+	private Paint localPaint;
+	private int localRed = 0;
+	private int localGreen = 0;
+	private int localBlue = 0;
+
+	private Paint remotePaint;
+	private int remoteRed = 0;
+	private int remoteGreen = 0;
+	private int remoteBlue = 0;
+
+	private Stack<Path> localPaths;
+	private Stack<Paint> localPaints;
+	private boolean localPathSaved = false;
+
+	private Stack<Path> remotePaths;
+	private Stack<Paint> remotePaints;
+	private boolean remotePathSaved = false;
+
 	private Path localPath;
 	private Path remotePath;
-	
+
 	private float lastX;
 	private float lastY;
 	private float remoteLastX;
@@ -37,22 +59,26 @@ public class ScribbleView extends View {
 	private float remoteRightBound;
 	private float remoteTopBound;
 	private float remoteBottomBound;
-	
-	private final float STROKE_WIDTH = 8.0f;
-	private final float HALF_STROKE_WIDTH = STROKE_WIDTH / 2;
-	
+
 	public ScribbleView(Context context, AttributeSet attrs) {
 		super(context, attrs);
-		paint = new Paint();
-		localPath = new Path();
-		remotePath = new Path();
-		paint.setColor(Color.WHITE);
-		paint.setStyle(Paint.Style.STROKE);
-		paint.setStrokeWidth(STROKE_WIDTH);
-		paint.setAntiAlias(true);
-		paint.setStrokeJoin(Paint.Join.ROUND);
+
+		localPaths = new Stack<Path>();
+		remotePaths = new Stack<Path>();
+
+		localPaints = new Stack<Paint>();
+		remotePaints = new Stack<Paint>();
+
+		localPaint = new Paint();
+		localPaint.setColor(Color.BLACK);
+		localPaint.setStyle(Paint.Style.STROKE);
+		localPaint.setStrokeWidth(8.0f);
+		localPaint.setAntiAlias(true);
+		localPaint.setStrokeJoin(Paint.Join.ROUND);
+
+		remotePaint = new Paint(localPaint);
 	}
-	
+
 	public void setHandler(Handler handler) {
 		this.handler = handler;
 	}
@@ -61,68 +87,85 @@ public class ScribbleView extends View {
 	public boolean onTouchEvent(MotionEvent event) {
 		float x = event.getX();
 		float y = event.getY();
-		
+
 		switch (event.getAction()) {
-			case MotionEvent.ACTION_DOWN:
-				localPath.moveTo(x, y);
-				lastX = x;
-				lastY = y;
-				Float[] point = new Float[2];
-				point[0] = x;
-				point[1] = y;
-				Log.d("FOO", "SENDING MESSAGE_WRITE");
-				handler.obtainMessage(Scribble.MESSAGE_WRITE, PATH_START, -1, point).sendToTarget();
-				return true;
-			case MotionEvent.ACTION_MOVE:
-			case MotionEvent.ACTION_UP:
-				
-				resetInvalidateRect(x, y);
-				ArrayList<Float> pointsBuf = new ArrayList<Float>();
-				
-				int historySize = event.getHistorySize();
-				for (int i = 0; i < historySize; i++) {
-					float historicalX = event.getHistoricalX(i);
-					float historicalY = event.getHistoricalY(i);
-					
-					pointsBuf.add(historicalX);
-					pointsBuf.add(historicalY);
-					
-					adjustInvalidateRect(historicalX, historicalY);
-					localPath.lineTo(historicalX, historicalY);
-				}
-				pointsBuf.add(x);
-				pointsBuf.add(y);
+		case MotionEvent.ACTION_DOWN:
 
-				Log.d("FOO", "SENDING MESSAGE_WRITE");
-				Float[] points = pointsBuf.toArray(new Float[pointsBuf.size()]);
-				handler.obtainMessage(Scribble.MESSAGE_WRITE, PATH_MOVE, -1, points).sendToTarget();
+			localPaint = new Paint(localPaint);
+			localPath = new Path();
+			localPathSaved = false;
 
-		        // After replaying history, connect the line to the touch point.
-				localPath.lineTo(x, y);
-				
-				// schedules a repaint
-				invalidate(
-						(int)(leftBound - HALF_STROKE_WIDTH),
-						(int)(topBound - HALF_STROKE_WIDTH),
-						(int)(rightBound + HALF_STROKE_WIDTH),
-						(int)(bottomBound + HALF_STROKE_WIDTH));
-				
-				lastX = x;
-				lastY = y;
-				
-				return true;
-				
-			default:
-				return false;
+			localPath.moveTo(x, y);
+			lastX = x;
+			lastY = y;
+			Float[] point = new Float[2];
+			point[0] = x;
+			point[1] = y;
+			handler.obtainMessage(Scribble.MESSAGE_WRITE, PATH_START, -1, point).sendToTarget();
+			
+			return true;
+			
+		case MotionEvent.ACTION_MOVE:
+		case MotionEvent.ACTION_UP:
+
+			resetInvalidateRect(x, y);
+			ArrayList<Float> pointsBuf = new ArrayList<Float>();
+
+			int historySize = event.getHistorySize();
+			for (int i = 0; i < historySize; i++) {
+				float historicalX = event.getHistoricalX(i);
+				float historicalY = event.getHistoricalY(i);
+
+				pointsBuf.add(historicalX);
+				pointsBuf.add(historicalY);
+
+				adjustInvalidateRect(historicalX, historicalY);
+				localPath.lineTo(historicalX, historicalY);
+			}
+			pointsBuf.add(x);
+			pointsBuf.add(y);
+
+			Float[] points = pointsBuf.toArray(new Float[pointsBuf.size()]);
+			handler.obtainMessage(Scribble.MESSAGE_WRITE, PATH_MOVE, -1, points).sendToTarget();
+
+			// After replaying history, connect the line to the touch point.
+			localPath.lineTo(x, y);
+
+			float halfStrokeWidth = localPaint.getStrokeWidth() / 2;
+
+			// schedules a repaint
+			invalidate((int) (leftBound - halfStrokeWidth),
+					(int) (topBound - halfStrokeWidth),
+					(int) (rightBound + halfStrokeWidth),
+					(int) (bottomBound + halfStrokeWidth));
+
+			lastX = x;
+			lastY = y;
+			
+			if (event.getAction() == MotionEvent.ACTION_UP) {
+				Log.d("foo", "SENDING PATH_END");
+				localPaths.push(localPath);
+				localPaints.push(localPaint);
+				localPathSaved = true;
+				handler.obtainMessage(Scribble.MESSAGE_WRITE, PATH_END, -1, new Float[0]).sendToTarget();
+			}
+
+			return true;
+
+		default:
+			return false;
 		}
 	}
-	
+
 	public void drawRemote(int pathStatus, float[] points) {
-		Log.d("drawRemote", "drawRemote");
 		if (pathStatus == PATH_CLEAR) {
-			Log.d("foo", "remote clear");
 			remoteClear();
 		} else if (pathStatus == PATH_START) {
+
+			remotePaint = new Paint(remotePaint);
+			remotePath = new Path();
+			remotePathSaved = false;
+			
 			float x = points[0];
 			float y = points[1];
 			remotePath.moveTo(x, y);
@@ -133,79 +176,142 @@ public class ScribbleView extends View {
 			float y = points[points.length - 1];
 			resetRemoteInvalidateRect(x, y);
 			for (int i = 0; i < points.length; i++) {
-				
+
 				x = points[i];
 				y = points[i + 1];
-				
+
 				adjustInvalidateRect(x, y);
 				remotePath.lineTo(x, y);
-				
+
 				// increment by two
 				i++;
 			}
-			
+
+			// After replaying history, connect the line to the touch point.
+			remotePath.lineTo(x, y);
+
+			float halfStrokeWidth = localPaint.getStrokeWidth() / 2;
+
 			// schedules a repaint
-			invalidate(
-					(int)(remoteLeftBound - HALF_STROKE_WIDTH),
-					(int)(remoteTopBound - HALF_STROKE_WIDTH),
-					(int)(remoteRightBound + HALF_STROKE_WIDTH),
-					(int)(remoteBottomBound + HALF_STROKE_WIDTH));
-			
+			invalidate((int) (leftBound - halfStrokeWidth),
+					(int) (topBound - halfStrokeWidth),
+					(int) (rightBound + halfStrokeWidth),
+					(int) (bottomBound + halfStrokeWidth));
+
 			remoteLastX = x;
 			remoteLastY = y;
+		} else if (pathStatus == PATH_END) {
+			Log.d("foo", "path end");
+			remotePaths.push(remotePath);
+			remotePaints.push(remotePaint);
+			remotePathSaved = true;
 		}
 	}
-	
+
 	public void remoteClear() {
-		Log.d("FOO", "REMOTE CLEAR");
-		remotePath.reset();
-		
+
+		if (remotePaths.size() > 0) {
+
+			// now can undo the path before the one just removed
+			remotePaths.pop();
+		}
+		if (remotePaints.size() > 0) {
+
+			// discard associated paint with that path
+			remotePaints.pop();
+		}
+
 		// repaint the view
 		invalidate();
 	}
-	
+
 	public void clear() {
-		localPath.reset();
-		
-		Float[] point = new Float[0];
-		handler.obtainMessage(Scribble.MESSAGE_WRITE, PATH_CLEAR, -1, point).sendToTarget();
-		
+
+		if (localPaths.size() > 0) {
+
+			// now can undo the path before the one just removed
+			localPaths.pop();
+		}
+		if (localPaints.size() > 0) {
+
+			// discard associated paint with that path
+			localPaints.pop();
+		}
+
+		handler.obtainMessage(Scribble.MESSAGE_WRITE, PATH_CLEAR, -1, new Float[0])
+				.sendToTarget();
+
 		// repaint the view
 		invalidate();
 	}
-	
+
 	public void resetRemoteInvalidateRect(float x, float y) {
 		remoteLeftBound = Math.min(remoteLastX, x);
 		remoteRightBound = Math.max(remoteLastX, x);
 		remoteTopBound = Math.min(remoteLastY, y);
 		remoteBottomBound = Math.max(remoteLastY, y);
 	}
-	
+
 	public void resetInvalidateRect(float x, float y) {
 		leftBound = Math.min(lastX, x);
 		rightBound = Math.max(lastX, x);
 		topBound = Math.min(lastY, y);
 		bottomBound = Math.max(lastY, y);
 	}
-	
+
 	public void adjustRemoteInvalidateRect(float x, float y) {
 		remoteLeftBound = Math.min(remoteLeftBound, x);
 		remoteRightBound = Math.max(remoteRightBound, x);
 		remoteTopBound = Math.min(remoteTopBound, y);
 		remoteBottomBound = Math.max(remoteBottomBound, y);
 	}
-	
+
 	public void adjustInvalidateRect(float x, float y) {
 		leftBound = Math.min(leftBound, x);
 		rightBound = Math.max(rightBound, x);
 		topBound = Math.min(topBound, y);
 		bottomBound = Math.max(bottomBound, y);
 	}
-	
+
 	@Override
 	protected void onDraw(Canvas canvas) {
-		canvas.drawColor(Color.GREEN);
-		canvas.drawPath(localPath, paint);
-		canvas.drawPath(remotePath, paint);
+		canvas.drawColor(Color.WHITE);
+
+		for (int i = 0; i < localPaths.size(); i++) {
+			canvas.drawPath(localPaths.get(i), localPaints.get(i));
+		}
+		if (localPath != null && !localPathSaved) {
+			canvas.drawPath(localPath, localPaint);
+		}
+
+		for (int i = 0; i < remotePaths.size(); i++) {
+			canvas.drawPath(remotePaths.get(i), remotePaints.get(i));
+		}
+		if (remotePath != null) {
+			canvas.drawPath(remotePath, remotePaint);
+		}
+	}
+
+	public float getPaintStrokeWidth() {
+		return localPaint.getStrokeWidth();
+	}
+
+	public int[] getPaintRGB() {
+		int[] rgb = new int[3];
+		rgb[0] = localRed;
+		rgb[1] = localGreen;
+		rgb[2] = localBlue;
+		return rgb;
+	}
+
+	public void setPaint(float size, int red, int green, int blue) {
+
+		localPaint = new Paint(localPaint);
+
+		this.localRed = red;
+		this.localGreen = green;
+		this.localBlue = blue;
+		localPaint.setARGB(255, red, green, blue);
+		localPaint.setStrokeWidth(size);
 	}
 }

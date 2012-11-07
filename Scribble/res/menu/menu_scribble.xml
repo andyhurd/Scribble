@@ -5,4 +5,6 @@
           android:title="@string/connect" />
     <item android:id="@+id/discoverable"
           android:title="@string/discoverable" />
+    <item android:id="@+id/brush"
+          android:title="@string/brush" />
 </menu>

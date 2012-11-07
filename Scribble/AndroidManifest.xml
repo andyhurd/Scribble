@@ -25,6 +25,10 @@
             </intent-filter>
         </activity>
         <activity
+            android:name=".BrushModifyActivity"
+            android:label="@string/title_activity_scribble" >
+        </activity>
+        <activity
             android:name=".ServerListActivity"
             android:label="@string/title_activity_scribble" >
         </activity>

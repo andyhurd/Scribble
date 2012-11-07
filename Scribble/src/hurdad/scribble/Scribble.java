@@ -10,6 +10,7 @@ import android.content.Intent;
 import android.os.Bundle;
 import android.os.Handler;
 import android.os.Message;
+import android.util.Log;
 import android.view.Menu;
 import android.view.MenuItem;
 import android.widget.Button;
@@ -26,6 +27,7 @@ public class Scribble extends Activity {
 	// intent request codes
 	private final int REQUEST_CONNECT_DEVICE = 0;
 	private final int REQUEST_ENABLE_BLUETOOTH = 1;
+	private final int REQUEST_BRUSH_MODIFY = 2;
 	
 	protected static final String DEVICE_NAME = "device_name";
 	protected static final String TOAST = "toast";
@@ -152,6 +154,14 @@ public class Scribble extends Activity {
 				finish();
 			}
 			
+		} else if (requestCode == REQUEST_BRUSH_MODIFY) {
+			if (resultCode == Activity.RESULT_OK) {
+				float size = data.getFloatExtra("size", 8f);
+				int red = data.getIntExtra("red", 0);
+				int green = data.getIntExtra("green", 0);
+				int blue = data.getIntExtra("blue", 0);
+				scribbleView.setPaint(size, red, green, blue);
+			}
 		} else {
 			super.onActivityResult(requestCode, resultCode, data);
 		}
@@ -201,6 +211,10 @@ public class Scribble extends Activity {
         		outStreamBuffer.putInt(pathStatus);
         		outStreamBuffer.putInt(floats.length);
         		outStreamBuffer.asFloatBuffer().put(floatBuffer);
+        		
+        		if (pathStatus == 2) {
+        			Log.d("FOO", "WRITING PATH_END");
+        		}
         		
         		// obtain byte[] from buffer and write to socket
         		byte[] bytes = outStreamBuffer.array();
@@ -256,6 +270,20 @@ public class Scribble extends Activity {
     		// clear locally-drawn path
     		((ScribbleView) findViewById(R.id.scribbleView)).clear();
     		return true;
+    		
+    	} else if (itemId == R.id.brush) {
+    		
+    		// get params to send to BrushModifyActivity
+    		float size = scribbleView.getPaintStrokeWidth();
+    		int[] rgb = scribbleView.getPaintRGB();
+    		
+			// starts default intent to enable bluetooth
+    		Intent intent = new Intent(this, BrushModifyActivity.class);
+    		intent.putExtra("size", size);
+    		intent.putExtra("red", rgb[0]);
+    		intent.putExtra("green", rgb[1]);
+    		intent.putExtra("blue", rgb[2]);
+    		startActivityForResult(intent, REQUEST_BRUSH_MODIFY);
     		
     	} else if (itemId == R.id.scan) {
     		

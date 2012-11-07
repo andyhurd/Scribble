@@ -1,6 +1,7 @@
 <resources>
 
     <string name="app_name">Scribble</string>
+    <string name="brush">Brush</string>
     <string name="bluetooth_not_supported">Bluetooth is required to connect to others, but is not supported by this device</string>
     <string name="clear">Clear</string>
     <string name="connect">Connect</string>
