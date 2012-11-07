@@ -10,7 +10,6 @@ import android.content.Intent;
 import android.os.Bundle;
 import android.os.Handler;
 import android.os.Message;
-import android.util.Log;
 import android.view.Menu;
 import android.view.MenuItem;
 import android.widget.Button;
@@ -160,7 +159,7 @@ public class Scribble extends Activity {
 				int red = data.getIntExtra("red", 0);
 				int green = data.getIntExtra("green", 0);
 				int blue = data.getIntExtra("blue", 0);
-				scribbleView.setPaint(size, red, green, blue);
+				scribbleView.setLocalPaint(size, red, green, blue);
 			}
 		} else {
 			super.onActivityResult(requestCode, resultCode, data);
@@ -211,10 +210,6 @@ public class Scribble extends Activity {
         		outStreamBuffer.putInt(pathStatus);
         		outStreamBuffer.putInt(floats.length);
         		outStreamBuffer.asFloatBuffer().put(floatBuffer);
-        		
-        		if (pathStatus == 2) {
-        			Log.d("FOO", "WRITING PATH_END");
-        		}
         		
         		// obtain byte[] from buffer and write to socket
         		byte[] bytes = outStreamBuffer.array();
