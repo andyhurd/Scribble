@@ -19,24 +19,32 @@
        	   android:layout_weight="0" >
 
 	       <Button
-	           android:id="@+id/clearButton"
+	           android:id="@+id/undoButton"
 	           android:layout_width="0dip"
 	           android:layout_height="wrap_content"
-	           android:text="@string/clear"
+	           android:text="@string/undo"
 	           android:textSize="25dip"
+	           android:background="@android:color/black"
 	           android:textColor="@android:color/white"
 		       style="?android:attr/borderlessButtonStyle"
-		       android:layout_weight="1" />
+		       android:layout_weight="5" />
+
+	       <ImageView
+	           android:id="@+id/connectImageView"
+	           android:layout_width="0dp"
+	           android:layout_height="wrap_content"
+	           android:layout_weight="1"
+	           android:layout_gravity="center_vertical"
+	           android:src="@drawable/cross" />
 	
-	       <Button
-	           android:id="@+id/connectButton"
+	       <TextView
+	           android:id="@+id/connectTextView"
 	           android:layout_width="0dip"
 	           android:layout_height="wrap_content"
-	           android:text="@string/connect"
+	           android:text="@string/local"
 	           android:textSize="25dip"
 	           android:textColor="@android:color/white"
-		       style="?android:attr/borderlessButtonStyle"
-		       android:layout_weight="1" />
+		       android:layout_weight="4" />
 
       </LinearLayout>
 

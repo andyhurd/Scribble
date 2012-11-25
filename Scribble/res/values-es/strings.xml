@@ -1,0 +1,22 @@
+<resources>
+    <string name="allowConnections">Permitir Conexiones</string>
+    <string name="app_name">Scribble</string>
+    <string name="brush">Cambiar Cepillo</string>
+    <string name="bluetooth_not_supported">Bluetooth se requiere para conectar a otros, pero no es compatible con este dispositivo</string>
+    <string name="clearAll">Borrar Todos</string>
+    <string name="connect">Conecte a Otro Dispositivo</string>
+    <string name="connected">Conectado</string>
+    <string name="connecting">Conectando</string>
+    <string name="connectionWasLost">Conexión Perdida</string>
+    <string name="done">Hecho</string>
+    <string name="title">Titulo</string>
+    <string name="local">Local</string>
+    <string name="menu_settings">Ajustes</string>
+    <string name="prompt_select_server">Conectar a:</string>
+    <string name="ok">OK</string>
+    <string name="scan">Escaneo</string>
+    <string name="server_info">Información de Servidor</string>
+    <string name="title_activity_scribble">ScribbleActivity</string>
+    <string name="unableToConnect">No se puede conectar</string>
+    <string name="undo">Deshacer</string>
+</resources>

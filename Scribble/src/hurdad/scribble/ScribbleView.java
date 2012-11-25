@@ -10,15 +10,17 @@ import android.graphics.Paint;
 import android.graphics.Path;
 import android.os.Handler;
 import android.util.AttributeSet;
+import android.util.Log;
 import android.view.MotionEvent;
 import android.view.View;
 
 public class ScribbleView extends View {
 	private static final int PATH_START = 0;
 	private static final int PATH_MOVE = 1;
-	private static final int PATH_CLEAR = 2;
-	private static final int FULL_CLEAR = 3;
-	private static final int BRUSH_CHANGE = 4;
+	private static final int PATH_END = 2;
+	private static final int PATH_CLEAR = 3;
+	private static final int FULL_CLEAR = 4;
+	private static final int BRUSH_CHANGE = 5;
 
 	private Handler handler;
 
@@ -144,6 +146,18 @@ public class ScribbleView extends View {
 			lastX = x;
 			lastY = y;
 
+			if (event.getAction() == MotionEvent.ACTION_UP) {
+				localPaths.push(localPath);
+				localPaints.push(localPaint);
+				pathOrder.add(true);
+					
+				localPath = new Path();
+				localPaint = new Paint(localPaint);
+				localPathStarted = false;
+				
+				handler.obtainMessage(Scribble.MESSAGE_WRITE, PATH_END, -1, new Float[0]).sendToTarget();
+			}
+
 			return true;
 
 		default:
@@ -169,6 +183,9 @@ public class ScribbleView extends View {
 			remoteLastY = y;
 		} else if (pathStatus == PATH_MOVE) {
 			if (remotePath != null) {
+				if (remotePath.isEmpty()) {
+					remotePath.moveTo(points[0], points[1]);
+				}
 				float x = points[points.length - 2];
 				float y = points[points.length - 1];
 				resetRemoteInvalidateRect(x, y);
@@ -177,26 +194,36 @@ public class ScribbleView extends View {
 					x = points[i];
 					y = points[i + 1];
 
-					adjustInvalidateRect(x, y);
+					adjustRemoteInvalidateRect(x, y);
 					remotePath.lineTo(x, y);
 
 					// increment by two
 					i++;
 				}
 
-				// After replaying history, connect the line to the touch point.
-				remotePath.lineTo(x, y);
-
-				float halfStrokeWidth = localPaint.getStrokeWidth() / 2;
+				float halfStrokeWidth = remotePaint.getStrokeWidth() / 2;
 
 				// schedules a repaint
-				invalidate((int) (leftBound - halfStrokeWidth),
-						(int) (topBound - halfStrokeWidth),
-						(int) (rightBound + halfStrokeWidth),
-						(int) (bottomBound + halfStrokeWidth));
+				invalidate((int) (remoteLeftBound - halfStrokeWidth),
+						(int) (remoteTopBound - halfStrokeWidth),
+						(int) (remoteRightBound + halfStrokeWidth),
+						(int) (remoteBottomBound + halfStrokeWidth));
 
 				remoteLastX = x;
 				remoteLastY = y;
+			}
+		} else if (pathStatus == PATH_END) {
+			if (remotePath != null) {
+				if (remotePathStarted) {
+					// end the remote path
+					remotePaths.push(remotePath);
+					remotePaints.push(remotePaint);
+					pathOrder.add(false);
+			
+					remotePath = new Path();
+					remotePaint = new Paint(remotePaint);
+					remotePathStarted = false;
+				}
 			}
 		} else if (pathStatus == BRUSH_CHANGE) {
 			setRemotePaint(points[0], (int) points[1], (int) points[2],
@@ -315,6 +342,19 @@ public class ScribbleView extends View {
 			canvas.drawPath(remotePath, remotePaint);
 		}
 	}
+	
+	public void clearAll() {
+		
+		localPaths.clear();
+		localPaints.clear();
+		
+		remotePaths.clear();
+		remotePaints.clear();
+		
+		pathOrder.clear();
+		
+		invalidate();
+	}
 
 	public float getPaintStrokeWidth() {
 		return localPaint.getStrokeWidth();
@@ -349,6 +389,14 @@ public class ScribbleView extends View {
 		Float[] paintParams = { size, (float) red, (float) green, (float) blue };
 		handler.obtainMessage(Scribble.MESSAGE_WRITE, BRUSH_CHANGE, -1,
 				paintParams).sendToTarget();
+	}
+	
+	public void sendPaint() {
+
+		Float[] paintParams = { localPaint.getStrokeWidth(), (float) localRed, (float) localGreen, (float) localBlue };
+		handler.obtainMessage(Scribble.MESSAGE_WRITE, BRUSH_CHANGE, -1,
+				paintParams).sendToTarget();
+		
 	}
 
 	public void setRemotePaint(float size, int red, int green, int blue) {

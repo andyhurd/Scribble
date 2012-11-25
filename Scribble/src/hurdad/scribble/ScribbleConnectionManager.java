@@ -33,6 +33,10 @@ public class ScribbleConnectionManager {
     public static final int STATE_CONNECTING = 2; // initiating connection
     public static final int STATE_CONNECTED = 3;  // connected
     
+    // constants for indicating message to display
+    public static final int UNABLE_TO_CONNECT = 0;
+    public static final int CONNECTION_WAS_LOST = 1;
+    
     // *************************************************************************
     // CONSTRUCTOR
 	//
@@ -421,7 +425,7 @@ public class ScribbleConnectionManager {
         setState(STATE_LISTEN);
 
         // inform user
-        toast("Unable to connect device");
+        toast(UNABLE_TO_CONNECT);
     }
 
     private void connectionLost() {
@@ -429,13 +433,13 @@ public class ScribbleConnectionManager {
         setState(STATE_LISTEN);
 
         // inform user
-        toast("Connection was lost");
+        toast(CONNECTION_WAS_LOST);
     }
     
-    private void toast(String info) {
+    private void toast(int toast_id) {
         Message message = handler.obtainMessage(Scribble.MESSAGE_TOAST);
         Bundle bundle = new Bundle();
-        bundle.putString(Scribble.TOAST, info);
+        bundle.putInt(Scribble.TOAST, toast_id);
         message.setData(bundle);
         handler.sendMessage(message);
     }

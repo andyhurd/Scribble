@@ -1,10 +1,10 @@
 <menu xmlns:android="http://schemas.android.com/apk/res/android">
-    <item android:id="@+id/clear"
-          android:title="@string/clear" />
+    <item android:id="@+id/clearAll"
+          android:title="@string/clearAll" />
     <item android:id="@+id/scan"
           android:title="@string/connect" />
-    <item android:id="@+id/discoverable"
-          android:title="@string/discoverable" />
+    <item android:id="@+id/allowConnections"
+          android:title="@string/allowConnections" />
     <item android:id="@+id/brush"
           android:title="@string/brush" />
 </menu>

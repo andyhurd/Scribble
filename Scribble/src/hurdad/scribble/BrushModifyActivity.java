@@ -48,6 +48,12 @@ public class BrushModifyActivity extends Activity {
 		greenSeekBar = (SeekBar) findViewById(R.id.greenSeekBar);
 		blueSeekBar = (SeekBar) findViewById(R.id.blueSeekBar);
 		
+		// set seek bar progress
+		brushSizeSeekBar.setProgress((int)size);
+		redSeekBar.setProgress(red);
+		greenSeekBar.setProgress(green);
+		blueSeekBar.setProgress(blue);
+		
 		// set on seek bar changed handling
 		brushSizeSeekBar.setOnSeekBarChangeListener(brushChangedListener);
 		redSeekBar.setOnSeekBarChangeListener(brushChangedListener);

@@ -4,4 +4,5 @@
     android:layout_height="wrap_content"
     android:text="@string/server_info"
  	android:textSize="50sp"
- 	android:textColor="@android:color/black" />
+ 	android:textColor="@android:color/black"
+ 	android:background="@android:color/white" />

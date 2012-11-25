@@ -7,12 +7,18 @@ import android.app.Activity;
 import android.bluetooth.BluetoothAdapter;
 import android.bluetooth.BluetoothDevice;
 import android.content.Intent;
+import android.content.res.Configuration;
 import android.os.Bundle;
 import android.os.Handler;
 import android.os.Message;
+import android.util.Log;
 import android.view.Menu;
 import android.view.MenuItem;
+import android.view.View;
+import android.view.View.OnClickListener;
 import android.widget.Button;
+import android.widget.ImageView;
+import android.widget.TextView;
 import android.widget.Toast;
 
 public class Scribble extends Activity {
@@ -39,7 +45,9 @@ public class Scribble extends Activity {
 	private static ScribbleView scribbleView;
 	
 	// main activity layout elements
-	private Button connectButton;
+	private TextView connectTextView;
+	private ImageView connectImageView;
+	private Button undoButton;
 	
     // *************************************************************************
     // LIFE CYCLE FUNCTIONS
@@ -55,32 +63,23 @@ public class Scribble extends Activity {
         scribbleView = (ScribbleView) findViewById(R.id.scribbleView);
         scribbleView.setHandler(handler);
 
+        // get handle for connect widgets on the bottom of the screen
+        connectTextView = (TextView) findViewById(R.id.connectTextView);
+        connectImageView = (ImageView) findViewById(R.id.connectImageView);
+
         // get handle for connect button on the bottom of the screen
-        connectButton = (Button) findViewById(R.id.connectButton);
+        undoButton = (Button) findViewById(R.id.undoButton);
+        
+        undoButton.setOnClickListener(new OnClickListener() {
+			public void onClick(View v) {
+	    		// clear locally-drawn path
+	    		((ScribbleView) findViewById(R.id.scribbleView)).clear();
+			}
+        });
         
         // get the bluetoothAdapter
         bluetoothAdapter = BluetoothAdapter.getDefaultAdapter();
     }
-
-    @Override
-	protected void onStart() {
-		super.onStart();
-		
-		// if bluetooth is available, but not enabled, prompt the user to enable
-		if (bluetoothAdapter != null && !bluetoothAdapter.isEnabled()) {
-			
-			// starts default intent to enable bluetooth
-    		Intent intentEnableBluetooth = new Intent(BluetoothAdapter.ACTION_REQUEST_ENABLE);
-    		startActivityForResult(intentEnableBluetooth, REQUEST_ENABLE_BLUETOOTH);
-    		
-		} else {
-			
-			// if the connectionManager is null, create it
-			if (connectionManager == null) {
-				setupConnection();
-			}
-		}
-	}
     
     @Override
 	protected void onResume() {
@@ -100,11 +99,15 @@ public class Scribble extends Activity {
 	@Override
 	protected void onDestroy() {
 		super.onDestroy();
-		
 		// stop all connection threads on exit
 		if (connectionManager != null) {
 			connectionManager.stop();
 		}
+	}
+	
+	@Override
+	public void onConfigurationChanged(Configuration newConfig) {
+	    super.onConfigurationChanged(newConfig);
 	}
 
     // *************************************************************************
@@ -173,22 +176,26 @@ public class Scribble extends Activity {
         	if (message.what == MESSAGE_STATE_CHANGE) {		// the connection status has changed, update UI
         		
         		if (message.arg1 == ScribbleConnectionManager.STATE_CONNECTED) {
-        			connectButton.setText("connected");
+        			connectTextView.setText(R.string.connected);
+        			connectImageView.setImageResource(R.drawable.check);
         			scribbleView.clear();
+        			scribbleView.sendPaint();
+        			
         		} else if (message.arg1 == ScribbleConnectionManager.STATE_CONNECTING) {
-        			connectButton.setText("connecting");
+        			connectTextView.setText(R.string.connecting);
         		} else {
-        			connectButton.setText("no conn");
+        			connectTextView.setText(R.string.local);
+        			connectImageView.setImageResource(R.drawable.cross);
         		}
         		
         	} else if (message.what == MESSAGE_WRITE) {		// this device has drawn, writing to inform peer
 
                 // only write if connected
-                if (connectionManager.getState() != ScribbleConnectionManager.STATE_CONNECTED) {
+                if (connectionManager == null || connectionManager.getState() != ScribbleConnectionManager.STATE_CONNECTED) {
                     return;
                 }
                 
-        		// get the path status (whether this data is a PATH_START, PATH_MOVE, or PATH_CLEAR event)
+        		// get the path status (whether this data is a PATH_START, PATH_MOVE, PATH_END, or PATH_CLEAR event)
         		int pathStatus = message.arg1;
         		
         		// get points to send
@@ -228,19 +235,26 @@ public class Scribble extends Activity {
         		// determine the number of floats to receive (sent in x-y pairs, {x1, y1, x2, y2, x3, ..})
         		int capacity = byteBuffer.getInt();
         		
-        		// use the capacity found to initialize points array and write points to it
-        		float[] points = new float[capacity];
-        		for (int i = 0; i < capacity; i++) {
-        			points[i] = byteBuffer.getFloat();
+        		if (pathStatus < 6 && capacity < 40) { // to bound to valid data
+	        		
+	        		// use the capacity found to initialize points array and write points to it
+	        		float[] points = new float[capacity];
+	        		for (int i = 0; i < capacity; i++) {
+	        			points[i] = byteBuffer.getFloat();
+	        		}
+	        		
+	        		// tell the scribble view canvas to draw the received path
+	        		scribbleView.drawRemote(pathStatus, points);
         		}
         		
-        		// tell the scribble view canvas to draw the received path
-        		scribbleView.drawRemote(pathStatus, points);
-        		
         	} else if (message.what == MESSAGE_TOAST) {
+        		int toast_id = message.getData().getInt(TOAST);
         		
-        		// allows for printing connection errors to activity
-        		Toast.makeText(Scribble.this, message.getData().getString(TOAST), Toast.LENGTH_SHORT).show();
+        		if (toast_id == ScribbleConnectionManager.UNABLE_TO_CONNECT) {
+        			Toast.makeText(Scribble.this, getString(R.string.unableToConnect), Toast.LENGTH_SHORT).show();
+        		} else if (toast_id == ScribbleConnectionManager.CONNECTION_WAS_LOST) {
+        			Toast.makeText(Scribble.this, getString(R.string.connectionWasLost), Toast.LENGTH_SHORT).show();
+        		}
         	}
         }
     };
@@ -260,10 +274,10 @@ public class Scribble extends Activity {
     @Override
     public boolean onOptionsItemSelected(MenuItem item) {
     	int itemId = item.getItemId();
-    	if (itemId == R.id.clear) {
+    	if (itemId == R.id.clearAll) {
     		
-    		// clear locally-drawn path
-    		((ScribbleView) findViewById(R.id.scribbleView)).clear();
+    		// clear all paths
+    		((ScribbleView) findViewById(R.id.scribbleView)).clearAll();
     		return true;
     		
     	} else if (itemId == R.id.brush) {
@@ -282,15 +296,52 @@ public class Scribble extends Activity {
     		
     	} else if (itemId == R.id.scan) {
     		
-            // prompt the user to select the server they would like to connect to
-            Intent serverIntent = new Intent(this, ServerListActivity.class);
-            startActivityForResult(serverIntent, REQUEST_CONNECT_DEVICE);
+    		// if bluetooth is available, but not enabled, prompt the user to enable
+    		if (bluetoothAdapter != null && !bluetoothAdapter.isEnabled()) {
+    			
+    			// starts default intent to enable bluetooth
+        		Intent intentEnableBluetooth = new Intent(BluetoothAdapter.ACTION_REQUEST_ENABLE);
+        		startActivityForResult(intentEnableBluetooth, REQUEST_ENABLE_BLUETOOTH);
+        		
+    		} else {
+    			
+    			// if the connectionManager is null, create it
+    			if (connectionManager == null) {
+    				setupConnection();
+    			}
+    		}
+
+    		if (bluetoothAdapter != null && bluetoothAdapter.isEnabled()) {
+                // prompt the user to select the server they would like to connect to
+                Intent serverIntent = new Intent(this, ServerListActivity.class);
+                startActivityForResult(serverIntent, REQUEST_CONNECT_DEVICE);
+    		}
+    		
             return true;
             
-    	} else if (itemId == R.id.discoverable) {
+    	} else if (itemId == R.id.allowConnections) {
+    		
+    		// if bluetooth is available, but not enabled, prompt the user to enable
+    		if (bluetoothAdapter != null && !bluetoothAdapter.isEnabled()) {
+    			
+    			// starts default intent to enable bluetooth
+        		Intent intentEnableBluetooth = new Intent(BluetoothAdapter.ACTION_REQUEST_ENABLE);
+        		startActivityForResult(intentEnableBluetooth, REQUEST_ENABLE_BLUETOOTH);
+        		
+    		} else {
+    			
+    			// if the connectionManager is null, create it
+    			if (connectionManager == null) {
+    				setupConnection();
+    			}
+            	connectionManager.listen();
+    		}
 
-    		// allow other devices to discover this device
-            allowDiscoverable();
+    		if (bluetoothAdapter != null && bluetoothAdapter.isEnabled()) {
+        		// allow other devices to discover this device
+                allowDiscoverable();
+    		}
+    		
             return true;
     	}
         return false;
